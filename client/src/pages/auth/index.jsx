@@ -1,34 +1,57 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import apiClient from "@/lib/api-client.js"; // Adjust the import based on your project structure
-import { SIGN_UP_ROUTE } from "../../utils/constant";
-import {LOGIN_ROUTE} from "../../utils/constant";
+import apiClient from "@/lib/api-client.js";
+import { SIGN_UP_ROUTE, LOGIN_ROUTE } from "../../utils/constant"; // Combined imports
 import { useAppStore } from "../../store";
+import { useNavigate } from "react-router-dom";
+
 const Auth = () => {
-  const [darkMode, setDarkMode] = useState(true);
-  const {setUserInfo} = useAppStore;
+  const { setUserInfo } = useAppStore();
   const [activeTab, setActiveTab] = useState("login");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(
+    localStorage.getItem("rememberMe") === "true"
+      ? localStorage.getItem("lastEmail") || ""
+      : ""
+  );
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(
+    localStorage.getItem("rememberMe") === "true"
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  // Lock to dark mode
+  // Check for existing session on mount
   useEffect(() => {
-    setDarkMode(true);
-  }, []);
+    const fetchUser = async () => {
+      try {
+        if (localStorage.getItem("rememberMe") === "true") {
+          const res = await apiClient.get("/api/auth/me", {
+            withCredentials: true,
+          });
+          if (res.data?.user) {
+            setUserInfo(res.data.user);
+            navigate(res.data.user.profileSetup ? "/chat" : "/profile");
+          }
+        }
+      } catch (error) {
+        localStorage.removeItem("rememberMe");
+        localStorage.removeItem("lastEmail");
+      }
+    };
+    fetchUser();
+  }, [navigate, setUserInfo]);
 
-  const validateRegister= () => {
+  const validateRegister = () => {
     if (!fullName || !email || !password) {
       toast.error("All fields are required.");
       return false;
     }
-    if(fullName.length < 3) {
-        toast.error("Full name must be at least 3 characters long.");
-        return false;
+    if (fullName.length < 3) {
+      toast.error("Full name must be at least 3 characters long.");
+      return false;
     }
     if (!/\S+@\S+\.\S+/.test(email)) {
       toast.error("Email address is invalid.");
@@ -43,44 +66,62 @@ const Auth = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    console.log("Submitting:", { email, password });
-  
+    setIsLoading(true);
+    setError("");
+
     try {
       const response = await apiClient.post(
-        '/api/auth/login',
-        { email, password },
+        LOGIN_ROUTE,
+        { email, password, remember },
         {
           withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json', // Explicitly set header
-          },
+          headers: { "Content-Type": "application/json" },
         }
       );
-      console.log("Response:", response.data);
+
+      if (response.data?.user) {
+        setUserInfo(response.data.user);
+        if (remember) {
+          localStorage.setItem("rememberMe", "true");
+          localStorage.setItem("lastEmail", email);
+        } else {
+          localStorage.removeItem("rememberMe");
+          localStorage.removeItem("lastEmail");
+        }
+        toast.success("Login successful!");
+        navigate(response.data.user.profileSetup ? "/chat" : "/profile");
+      }
     } catch (err) {
-      console.error("Full error:", err);
-      setError(err.response?.data?.message || "Login failed");
+      setError(err.response?.data?.message || "Login failed. Please try again.");
+      toast.error("Login failed. Please check your credentials.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    if (!validateRegister()) return;
+    
     setIsLoading(true);
     setError("");
 
     try {
-      if (validateRegister()){
-        const response = await apiClient.post(SIGN_UP_ROUTE, {
-          fullName,
-          email,
-          password,
-        }, {withCredentials: true});
-        console.log({response})
-        toast.success("Registration successful! Please log in.");
+      const response = await apiClient.post(
+        SIGN_UP_ROUTE,
+        { fullName, email, password },
+        { withCredentials: true }
+      );
+
+      if (response.data?.user) {
+        setUserInfo(response.data.user);
+        toast.success("Registration successful!");
+        navigate(response.data.user.profileSetup ? "/chat" : "/profile");
       }
-      
     } catch (err) {
-      setError(err.message || "Registration failed. Please try again.");
+      const errorMsg = err.response?.data?.message || "Registration failed";
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -257,10 +298,11 @@ const LoginForm = ({
   return (
     <form className="space-y-6" onSubmit={onSubmit}>
       <div>
-        <label className="block mb-3 text-xs font-medium tracking-wider uppercase text-gray-500">
+        <label htmlFor="login-email" className="block mb-3 text-xs font-medium tracking-wider uppercase text-gray-500">
           EMAIL ADDRESS
         </label>
         <input
+          id="login-email"
           type="email"
           className="w-full px-4 py-3 text-sm bg-gray-800 border border-gray-700 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 text-gray-200 placeholder-gray-500"
           placeholder="your@email.com"
@@ -268,20 +310,26 @@ const LoginForm = ({
           onChange={(e) => onEmailChange(e.target.value)}
           required
           disabled={isLoading}
+          autoComplete="email"
         />
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-3">
-          <label className="text-xs font-medium tracking-wider uppercase text-gray-500">
+          <label htmlFor="login-password" className="text-xs font-medium tracking-wider uppercase text-gray-500">
             PASSWORD
           </label>
-          <a href="#" className="text-xs text-amber-500 hover:text-amber-400">
+          <button 
+            type="button"
+            className="text-xs text-amber-500 hover:text-amber-400 focus:outline-none"
+            onClick={() => {/* TODO: Implement forgot password */}}
+          >
             FORGOT?
-          </a>
+          </button>
         </div>
         <div className="relative">
           <input
+            id="login-password"
             type={isRevealPwd ? "text" : "password"}
             className="w-full px-4 py-3 text-sm bg-gray-800 border border-gray-700 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 text-gray-200 placeholder-gray-500"
             placeholder="••••••••"
@@ -290,12 +338,14 @@ const LoginForm = ({
             required
             minLength={8}
             disabled={isLoading}
+            autoComplete="current-password"
           />
           <button
             type="button"
-            className="absolute right-3 top-3 text-sm text-gray-400 hover:text-gray-300"
+            className="absolute right-3 top-3 text-sm text-gray-400 hover:text-gray-300 focus:outline-none"
             onClick={() => setIsRevealPwd(!isRevealPwd)}
             disabled={isLoading}
+            aria-label={isRevealPwd ? "Hide password" : "Show password"}
           >
             {isRevealPwd ? "Hide" : "Show"}
           </button>
@@ -377,10 +427,11 @@ const RegisterForm = ({
   return (
     <form className="space-y-6" onSubmit={onSubmit}>
       <div>
-        <label className="block mb-3 text-xs font-medium tracking-wider uppercase text-gray-500">
+        <label htmlFor="register-name" className="block mb-3 text-xs font-medium tracking-wider uppercase text-gray-500">
           FULL NAME
         </label>
         <input
+          id="register-name"
           type="text"
           className="w-full px-4 py-3 text-sm bg-gray-800 border border-gray-700 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 text-gray-200 placeholder-gray-500"
           placeholder="John Doe"
@@ -388,14 +439,16 @@ const RegisterForm = ({
           onChange={(e) => onFullNameChange(e.target.value)}
           required
           disabled={isLoading}
+          autoComplete="name"
         />
       </div>
 
       <div>
-        <label className="block mb-3 text-xs font-medium tracking-wider uppercase text-gray-500">
+        <label htmlFor="register-email" className="block mb-3 text-xs font-medium tracking-wider uppercase text-gray-500">
           EMAIL ADDRESS
         </label>
         <input
+          id="register-email"
           type="email"
           className="w-full px-4 py-3 text-sm bg-gray-800 border border-gray-700 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 text-gray-200 placeholder-gray-500"
           placeholder="your@email.com"
@@ -403,15 +456,17 @@ const RegisterForm = ({
           onChange={(e) => onEmailChange(e.target.value)}
           required
           disabled={isLoading}
+          autoComplete="email"
         />
       </div>
 
       <div>
-        <label className="block mb-3 text-xs font-medium tracking-wider uppercase text-gray-500">
+        <label htmlFor="register-password" className="block mb-3 text-xs font-medium tracking-wider uppercase text-gray-500">
           PASSWORD
         </label>
         <div className="relative">
           <input
+            id="register-password"
             type={isRevealPwd ? "text" : "password"}
             className="w-full px-4 py-3 text-sm bg-gray-800 border border-gray-700 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 text-gray-200 placeholder-gray-500"
             placeholder="••••••••"
@@ -420,12 +475,14 @@ const RegisterForm = ({
             required
             minLength={8}
             disabled={isLoading}
+            autoComplete="new-password"
           />
           <button
             type="button"
-            className="absolute right-3 top-3 text-sm text-gray-400 hover:text-gray-300"
+            className="absolute right-3 top-3 text-sm text-gray-400 hover:text-gray-300 focus:outline-none"
             onClick={() => setIsRevealPwd(!isRevealPwd)}
             disabled={isLoading}
+            aria-label={isRevealPwd ? "Hide password" : "Show password"}
           >
             {isRevealPwd ? "Hide" : "Show"}
           </button>
