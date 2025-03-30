@@ -1,12 +1,14 @@
 import User from "../models/UserModel.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import multer from "multer";
 
-// Token expiration times
-const SHORT_TOKEN_AGE = 3600; // 1 hour in seconds
-const LONG_TOKEN_AGE = 30 * 24 * 3600; // 30 days in seconds
+// Token expiration time (1 hour in seconds)
+const TOKEN_AGE = 3600;
 
-const createToken = (email, userId, rememberMe) => {
+
+
+const createToken = (email, userId) => {
   if (!process.env.JWT_SECRET) {
     throw new Error("JWT_SECRET is missing in environment variables");
   }
@@ -14,7 +16,7 @@ const createToken = (email, userId, rememberMe) => {
     { email, userId },
     process.env.JWT_SECRET,
     {
-      expiresIn: rememberMe ? LONG_TOKEN_AGE : SHORT_TOKEN_AGE,
+      expiresIn: TOKEN_AGE,
     }
   );
 };
@@ -45,22 +47,21 @@ export const signup = async (req, res, next) => {
       return res.status(409).json({ message: "Email already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12); // Increased salt rounds to 12
+    // const hashedPassword = await bcrypt.hash(password, 12);
     
     const user = await User.create({
       fullName,
       email,
-      password: hashedPassword,
+      password,
     });
 
-    // Default to "not remembered" for new signups
-    const token = createToken(user.email, user._id, false);
+    const token = createToken(user.email, user._id);
 
     res.cookie("jwt", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict", // Changed to strict for better security
-      maxAge: SHORT_TOKEN_AGE * 1000,
+      sameSite: "strict",
+      maxAge: TOKEN_AGE * 1000,
     });
 
     return res.status(201).json({
@@ -74,13 +75,14 @@ export const signup = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Signup Error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
+        res.status(500).json({ message: "Server error" });
+      }
+    };
+
 
 export const login = async (req, res) => {
   try {
-    const { email, password, remember } = req.body;
+    const { email, password } = req.body;
 
     if (!email?.trim() || !password?.trim()) {
       return res.status(400).json({ message: "All fields are required" });
@@ -92,20 +94,23 @@ export const login = async (req, res) => {
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
+
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Create token with rememberMe consideration
-    const token = createToken(user.email, user._id, remember);
+    // Create and set JWT token
+    const token = createToken(user.email, user._id);
 
+    // Set cookie with JWT token
     res.cookie("jwt", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict", // Changed to strict for better security
-      maxAge: remember ? LONG_TOKEN_AGE * 1000 : SHORT_TOKEN_AGE * 1000,
+      sameSite: "strict",
+      maxAge: TOKEN_AGE * 1000,
     });
 
+    // Send successful response with user data
     return res.status(200).json({
       message: "Login successful",
       user: {
@@ -113,72 +118,76 @@ export const login = async (req, res) => {
         email: user.email,
         fullName: user.fullName,
         profileSetup: user.profileSetup,
-        image: user.image,
-        color: user.color,
       },
     });
+    
   } catch (error) {
     console.error("Login Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-export const checkAuth = async (req, res) => {
+export const getUserInfo = async (req, res) => {
   try {
     const token = req.cookies.jwt;
     if (!token) {
-      return res.status(401).json({ message: "Not authenticated" });
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select("-password");
-    
+    const user = await User.findById(decoded.userId);
+
     if (!user) {
-      // Clear invalid cookie
-      res.clearCookie("jwt", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-      });
-      return res.status(401).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found" });
     }
 
-    return res.status(200).json({
-      user: {
-        id: user._id,
-        email: user.email,
-        fullName: user.fullName,
-        profileSetup: user.profileSetup,
-        image: user.image,
-        color: user.color,
-      }
+    res.status(200).json({
+      id: user._id,
+      email: user.email,
+      fullName: user.fullName,
+      profileSetup: user.profileSetup,
     });
   } catch (error) {
-    console.error("Auth Check Error:", error);
-    
-    // Clear invalid cookie
-    res.clearCookie("jwt", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-    });
-    
-    if (error instanceof jwt.TokenExpiredError) {
-      return res.status(401).json({ message: "Session expired" });
-    }
-    if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ message: "Invalid token" });
-    }
-    
-    return res.status(500).json({ message: "Server error" });
+    console.error("Get User Info Error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-export const logout = (req, res) => {
-  res.clearCookie("jwt", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-  });
-  return res.status(200).json({ message: "Logout successful" });
+export const updateProfile = async (req, res) => {
+  try {
+    const token = req.cookies.jwt;
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId;
+
+    const { firstName, lastName } = req.body;
+    const profileImage = req.file;
+
+    if (!firstName?.trim() || !lastName?.trim()) {
+      return res.status(400).json({ message: "Full name is required" });
+    }
+
+    let imageUrl = null;
+    if (profileImage) {
+      imageUrl = `data:${profileImage.mimetype};base64,${profileImage.buffer.toString("base64")}`;
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        fullName: `${firstName} ${lastName}`,
+        image: imageUrl, // Store image URL in the database
+        profileSetup: true,
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({ message: "Profile updated successfully", user: updatedUser });
+  } catch (error) {
+    console.error("Update Profile Error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
 };

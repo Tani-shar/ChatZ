@@ -9,41 +9,16 @@ import { useNavigate } from "react-router-dom";
 const Auth = () => {
   const { setUserInfo } = useAppStore();
   const [activeTab, setActiveTab] = useState("login");
-  const [email, setEmail] = useState(
-    localStorage.getItem("rememberMe") === "true"
-      ? localStorage.getItem("lastEmail") || ""
-      : ""
-  );
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [remember, setRemember] = useState(
-    localStorage.getItem("rememberMe") === "true"
-  );
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
   // Check for existing session on mount
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        if (localStorage.getItem("rememberMe") === "true") {
-          const res = await apiClient.get("/api/auth/me", {
-            withCredentials: true,
-          });
-          if (res.data?.user) {
-            setUserInfo(res.data.user);
-            navigate(res.data.user.profileSetup ? "/chat" : "/profile");
-          }
-        }
-      } catch (error) {
-        localStorage.removeItem("rememberMe");
-        localStorage.removeItem("lastEmail");
-      }
-    };
-    fetchUser();
-  }, [navigate, setUserInfo]);
-
+  
   const validateRegister = () => {
     if (!fullName || !email || !password) {
       toast.error("All fields are required.");
@@ -72,7 +47,7 @@ const Auth = () => {
     try {
       const response = await apiClient.post(
         LOGIN_ROUTE,
-        { email, password, remember },
+        { email, password},
         {
           withCredentials: true,
           headers: { "Content-Type": "application/json" },
@@ -81,19 +56,16 @@ const Auth = () => {
 
       if (response.data?.user) {
         setUserInfo(response.data.user);
-        if (remember) {
-          localStorage.setItem("rememberMe", "true");
-          localStorage.setItem("lastEmail", email);
-        } else {
-          localStorage.removeItem("rememberMe");
-          localStorage.removeItem("lastEmail");
-        }
         toast.success("Login successful!");
         navigate(response.data.user.profileSetup ? "/chat" : "/profile");
       }
+      console.log('Full response:', response); 
     } catch (err) {
+      console.error('Full error:', err); // Add this
+      console.error('Response data:', err.response?.data); // Add this
       setError(err.response?.data?.message || "Login failed. Please try again.");
       toast.error("Login failed. Please check your credentials.");
+  
     } finally {
       setIsLoading(false);
     }
@@ -114,9 +86,9 @@ const Auth = () => {
       );
 
       if (response.data?.user) {
-        setUserInfo(response.data.user);
+        // setUserInfo(response.data.user);
         toast.success("Registration successful!");
-        navigate(response.data.user.profileSetup ? "/chat" : "/profile");
+        // navigate(response.data.user.profileSetup ? "/chat" : "/profile");
       }
     } catch (err) {
       const errorMsg = err.response?.data?.message || "Registration failed";
@@ -224,11 +196,11 @@ const Auth = () => {
                   <LoginForm
                     email={email}
                     password={password}
-                    remember={remember}
+                    // remember={remember}
                     isLoading={isLoading}
                     onEmailChange={setEmail}
                     onPasswordChange={setPassword}
-                    onRememberChange={setRemember}
+                    // onRememberChange={setRemember}
                     onSubmit={handleLogin}
                   />
                 ) : (
@@ -286,11 +258,11 @@ const Auth = () => {
 const LoginForm = ({
   email,
   password,
-  remember,
+  // remember,
   isLoading,
   onEmailChange,
   onPasswordChange,
-  onRememberChange,
+  // onRememberChange,
   onSubmit,
 }) => {
   const [isRevealPwd, setIsRevealPwd] = useState(false);
@@ -358,8 +330,8 @@ const LoginForm = ({
           name="remember-me"
           type="checkbox"
           className="h-4 w-4 rounded bg-gray-800 border-gray-700 text-amber-500 focus:ring-amber-500/30"
-          checked={remember}
-          onChange={(e) => onRememberChange(e.target.checked)}
+          // checked={remember}
+          // onChange={(e) => onRememberChange(e.target.checked)}
           disabled={isLoading}
         />
         <label
