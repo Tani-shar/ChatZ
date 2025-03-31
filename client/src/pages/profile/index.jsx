@@ -1,13 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { FaUser, FaCamera, FaCheck, FaGoogle, FaApple, FaLinkedin } from 'react-icons/fa';
 import { UPDATE_PROFILE_ROUTE } from '../../utils/constant';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../../lib/api-client';
+import { useAppStore } from '../../store';
+import { toast } from 'sonner';
 const ChatZProfilePage = () => {
   const [profileImage, setProfileImage] = useState(null);
   const [previewImage, setPreviewImage] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const fileInputRef = useRef(null);
+  const Navigate = useNavigate();
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -38,10 +42,13 @@ const ChatZProfilePage = () => {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
-            // withCredentials: true,
+            withCredentials: true,
         });
         const result = await response.data;
+        useAppStore.setState({ userInfo: { ...useAppStore.getState().userInfo, profileSetup: true } });
+
         console.log(result);
+        Navigate('/chat')
     }
     catch(error){
         console.error("Error uploading profile:", error);
@@ -126,6 +133,7 @@ const ChatZProfilePage = () => {
           <button
             type="submit"
             className="w-full bg-[#E17100] hover:bg-[#E17100] text-white font-medium py-3 px-4 rounded shadow-sm transition duration-300 uppercase tracking-wider"
+            
           >
             Save Profile
           </button>
