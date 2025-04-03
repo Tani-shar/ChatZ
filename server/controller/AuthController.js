@@ -190,4 +190,20 @@ export const updateProfile = async (req, res) => {
     console.error("Update Profile Error:", error);
     return res.status(500).json({ message: "Server error" });
   }
+}; 
+
+export const logout = async (req, res) => {
+  try {
+    res.cookie("jwt", "", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+      maxAge: 1, // Set expiration date to the past
+    });
+    // res.clearCookie("jwt");
+    return res.status(200).json({ message: "Logout successful" });
+  } catch (error) {
+    console.error("Logout Error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
 };

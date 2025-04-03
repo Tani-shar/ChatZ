@@ -6,9 +6,9 @@ import { Toaster } from "@/components/ui/sonner.jsx"
 
 createRoot(document.getElementById('root')).render(
   <>
-  // <StrictMode>
+   <StrictMode>
     <App />
     <Toaster closeButton />
-  // </StrictMode>,
+   </StrictMode>
   </>
 )

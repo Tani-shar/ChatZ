@@ -3,16 +3,18 @@ import { FaUser, FaCamera, FaCheck, FaGoogle, FaApple, FaLinkedin } from 'react-
 import { UPDATE_PROFILE_ROUTE } from '../../utils/constant';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../lib/api-client';
-import { useAppStore } from '../../store';
+
+// import { useAppStore } from '../store';
 import { toast } from 'sonner';
 const ChatZProfilePage = () => {
   const [profileImage, setProfileImage] = useState(null);
   const [previewImage, setPreviewImage] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  // const [image , setImage] = useState(null);
   const fileInputRef = useRef(null);
   const Navigate = useNavigate();
-
+  
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -24,7 +26,8 @@ const ChatZProfilePage = () => {
       reader.readAsDataURL(file);
     }
   };
-
+//client\src\lib\api-client.js
+//client\src\pages\chat\components\contact-container\index.jsx
   const handleSubmit = async (e) => {
     e.preventDefault();
     // Handle form submission here

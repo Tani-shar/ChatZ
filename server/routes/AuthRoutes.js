@@ -1,5 +1,5 @@
 import {Router} from 'express';
-import {getUserInfo, signup, updateProfile} from '../controller/AuthController.js';
+import {getUserInfo, logout, signup, updateProfile} from '../controller/AuthController.js';
 import {login} from '../controller/AuthController.js';
 import { verifyToken } from '../middleware/AuthMiddleware.js';
 import multer from 'multer';
@@ -14,5 +14,6 @@ authRoutes.post('/login', login);
 authRoutes.get('/user-info',verifyToken, getUserInfo); // Middleware to verify token
 
 authRoutes.post('/update-profile', verifyToken,upload.single("profileImage"),updateProfile)
+authRoutes.post('/logout', logout);
 
 export default authRoutes;
