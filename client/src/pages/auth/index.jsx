@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import apiClient from "@/lib/api-client.js";
-import { SIGN_UP_ROUTE, LOGIN_ROUTE } from "../../utils/constant"; // Combined imports
+import { SIGN_UP_ROUTE, LOGIN_ROUTE } from "../../utils/constant";
 import { useAppStore } from "../../store";
 import { useNavigate } from "react-router-dom";
 
@@ -12,13 +12,10 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  // Check for existing session on mount
-  
   const validateRegister = () => {
     if (!fullName || !email || !password) {
       toast.error("All fields are required.");
@@ -47,25 +44,39 @@ const Auth = () => {
     try {
       const response = await apiClient.post(
         LOGIN_ROUTE,
-        { email, password},
+        { email, password },
         {
           withCredentials: true,
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
         }
       );
 
       if (response.data?.user) {
-        setUserInfo(response.data.user);
+        // Store user info and token in app state
+        setUserInfo({
+          ...response.data.user,
+          token: response.data.token // Make sure your backend returns the token
+        });
+        
+        // Store token in localStorage for persistence
+        localStorage.setItem('jwtToken', response.data.token);
+        
         toast.success("Login successful!");
         navigate(response.data.user.profileSetup ? "/chat" : "/profile");
       }
-      console.log('Full response:', response); 
     } catch (err) {
-      console.error('Full error:', err); // Add this
-      console.error('Response data:', err.response?.data); // Add this
-      setError(err.response?.data?.message || "Login failed. Please try again.");
-      toast.error("Login failed. Please check your credentials.");
-  
+      console.error('Login error:', err);
+      const errorMsg = err.response?.data?.message || "Login failed. Please try again.";
+      setError(errorMsg);
+      toast.error(errorMsg);
+      
+      // Clear invalid tokens
+      if (err.response?.status === 401) {
+        localStorage.removeItem('jwtToken');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -82,15 +93,28 @@ const Auth = () => {
       const response = await apiClient.post(
         SIGN_UP_ROUTE,
         { fullName, email, password },
-        { withCredentials: true }
+        { 
+          withCredentials: true,
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          }
+        }
       );
 
       if (response.data?.user) {
-        // setUserInfo(response.data.user);
+        // Store user info and token
+        setUserInfo({
+          ...response.data.user,
+          token: response.data.token
+        });
+        localStorage.setItem('jwtToken', response.data.token);
+        
         toast.success("Registration successful!");
-        // navigate(response.data.user.profileSetup ? "/chat" : "/profile");
+        navigate(response.data.user.profileSetup ? "/chat" : "/profile");
       }
     } catch (err) {
+      console.error('Registration error:', err);
       const errorMsg = err.response?.data?.message || "Registration failed";
       setError(errorMsg);
       toast.error(errorMsg);

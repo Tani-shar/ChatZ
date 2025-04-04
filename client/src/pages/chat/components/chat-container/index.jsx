@@ -6,12 +6,15 @@ import { useEffect, useRef, useState } from "react";
 import { GrAttachment } from "react-icons/gr";
 import EmojiPicker from "emoji-picker-react";
 import { useAppStore } from "../../../../store";
+import { useSocket } from "../../../../context/SocketContext";
+// import { userInfo } from "os";
 
 const ChatContainer = () => {
+  const socket = useSocket();
   const [message, setMessage] = useState("");
   const emojiRef = useRef(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const {closeChat, selectedChatData} = useAppStore();
+  const {closeChat, selectedChatData, selectedChatType, userInfo} = useAppStore();
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -31,6 +34,31 @@ const ChatContainer = () => {
     // Keep the picker open after selection
     // setEmojiPickerOpen(false); // Uncomment if you want it to close
   };
+
+  const sendMessage = () => {
+    console.log("Socket instance:", socket);
+  
+    if (!socket || !socket.current) {
+      console.error("Socket is not initialized.");
+      return;
+    }
+    
+    if(selectedChatType === "contact"){
+      console.log("Sending message:", message);
+      console.log("User ID being sent:", userInfo.id);
+
+      socket.current.emit("sendMessage", { 
+        content: message, 
+        sender: userInfo.id,
+        recipient: selectedChatData._id,
+        fileUrl: undefined,
+        messageType: "text",
+      });
+      console.log("Sending message:", message);
+    }
+  }
+  
+  
 
   // Sample c hat messages
   const messages = [
@@ -180,7 +208,9 @@ const ChatContainer = () => {
           <button className="p-2 text-gray-400 hover:text-white">
             <FiMic size={22} />
           </button>
-          <button className="ml-2 p-2 bg-[#005c4b] text-white rounded-full hover:bg-[#008069]">
+          <button className="ml-2 p-2 bg-[#005c4b] text-white rounded-full hover:bg-[#008069]"
+            onClick={sendMessage} // Function to send the message
+          >
             <IoMdSend size={20} />
           </button>
         </div>
