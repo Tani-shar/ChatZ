@@ -11,7 +11,7 @@ const ChatContainer = () => {
   const [message, setMessage] = useState("");
   const emojiRef = useRef(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const {closeChat} = useAppStore();
+  const {closeChat, selectedChatData} = useAppStore();
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -81,12 +81,20 @@ const ChatContainer = () => {
           </button>
           <div className="relative mr-3">
             <div className="w-10 h-10 rounded-full bg-[#3a3b4c] flex items-center justify-center text-white">
-              JD
+            {selectedChatData.image ? (
+                        <img
+                          src={selectedChatData.image}
+                          alt={selectedChatData.fullName}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <span>{selectedChatData.fullName.charAt(0).toUpperCase()}</span>
+                      )}
             </div>
             <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0b0e11]"></div>
           </div>
           <div>
-            <h3 className="text-white font-medium">John Doe</h3>
+            <h3 className="text-white font-medium">{selectedChatData.fullName}</h3>
             <p className="text-xs text-gray-400">Online</p>
           </div>
         </div>
