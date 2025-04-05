@@ -1,27 +1,74 @@
-import { FiMoreVertical, FiPaperclip, FiMic, FiSmile } from "react-icons/fi";
-import { BsArrowLeft, BsCheck2All, BsCrosshair } from "react-icons/bs";
+import { FiPaperclip, FiMic, FiSmile } from "react-icons/fi";
+import { BsArrowLeft, BsCheck2All } from "react-icons/bs";
 import { IoMdSend } from "react-icons/io";
-import { RiCloseCircleLine, RiCloseFill, RiCrossFill, RiCrossLine, RiSearchLine } from "react-icons/ri";
+import { RiCloseFill, RiSearchLine } from "react-icons/ri";
 import { useEffect, useRef, useState } from "react";
-import { GrAttachment } from "react-icons/gr";
 import EmojiPicker from "emoji-picker-react";
 import { useAppStore } from "../../../../store";
 import { useSocket } from "../../../../context/SocketContext";
-// import { userInfo } from "os";
+import moment from "moment";
 
 const ChatContainer = () => {
   const socket = useSocket();
   const [message, setMessage] = useState("");
   const emojiRef = useRef(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const {closeChat, selectedChatData, selectedChatType, userInfo} = useAppStore();
+  const { closeChat, selectedChatData, selectedChatType, userInfo, selectedChatMessages } = useAppStore();
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [selectedChatMessages]);
+  
+  const renderMessages = () => {
+    let lastDate = null;
+    return selectedChatMessages.map((message) => {
+      const messageDate = moment(message.timestamp).format("YYYY-MM-DD");
+      const showDate = lastDate !== messageDate;
+      lastDate = messageDate;
+      return (
+        <div key={message._id}>
+          {showDate && (
+            <div className="text-center text-gray-500 text-xs my-2">
+              {moment(message.timestamp).format("LL")}
+            </div>  
+          )}
+          {selectedChatType === "contact" && renderDMMessages(message)}
+        </div>
+      );
+    });
+  };
+
+  const renderDMMessages = (message) => {
+    return (
+      <div className={`${message.sender === userInfo.id ? "justify-end" : "justify-start"} flex mb-3`}>
+        <div className={`max-w-xs md:max-w-md rounded-lg px-4 py-2 ${
+          message.sender === userInfo.id 
+            ? "bg-[#005c4b] text-white rounded-tr-none" 
+            : "bg-[#1e1f2a] text-white rounded-tl-none"
+        }`}> 
+          <p className="break-words">{message.content}</p>
+          <div className={`flex items-center justify-end space-x-1 mt-1 text-xs ${
+            message.sender === userInfo.id ? "text-[#a3beb6]" : "text-gray-500"
+          }`}>
+            <span>{moment(message.timestamp).format("LT")}</span>
+            {message.sender === userInfo.id && (
+              <BsCheck2All className={message.status === "read" ? "text-blue-400" : ""} />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   useEffect(() => {
     function handleClickOutside(event) {
       if (emojiRef.current && !emojiRef.current.contains(event.target)) {
         setEmojiPickerOpen(false);
       }
-    };
+    }
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
@@ -31,73 +78,33 @@ const ChatContainer = () => {
 
   const handleAddEmoji = (emojiData) => {
     setMessage((prevMessage) => prevMessage + emojiData.emoji);
-    // Keep the picker open after selection
-    // setEmojiPickerOpen(false); // Uncomment if you want it to close
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   };
 
   const sendMessage = () => {
-    console.log("Socket instance:", socket);
-  
-    if (!socket || !socket.current) {
-      console.error("Socket is not initialized.");
+    if (!socket || !socket.current || !message.trim()) {
       return;
     }
     
-    if(selectedChatType === "contact"){
-      console.log("Sending message:", message);
-      console.log("User ID being sent:", userInfo.id);
-
+    if (selectedChatType === "contact") {
       socket.current.emit("sendMessage", { 
         content: message, 
-        sender: userInfo.id,
-        recipient: selectedChatData._id,
+        sender: userInfo.id, // 67f02eb050939f9d2c28b14a
+        recipient: selectedChatData._id, // 67ea43428544e30bde6d753f
         fileUrl: undefined,
         messageType: "text",
       });
-      console.log("Sending message:", message);
+      
+      // Clear the message after sending
+      setMessage("");
     }
-  }
-  
-  
-
-  // Sample c hat messages
-  const messages = [
-    {
-      id: 1,
-      sender: "other",
-      text: "Hey there! How are you doing?",
-      time: "10:30 AM",
-      status: "read",
-    },
-    {
-      id: 2,
-      sender: "me",
-      text: "I'm good, thanks! Working on that project we discussed.",
-      time: "10:32 AM",
-      status: "read",
-    },
-    {
-      id: 3,
-      sender: "other",
-      text: "Great! Did you get a chance to look at the designs I sent?",
-      time: "10:33 AM",
-      status: "read",
-    },
-    {
-      id: 4,
-      sender: "me",
-      text: "Yes, they look amazing! I have a few small suggestions though.",
-      time: "10:35 AM",
-      status: "delivered",
-    },
-    {
-      id: 5,
-      sender: "other",
-      text: "I'd love to hear them. Maybe we can schedule a quick call tomorrow?",
-      time: "10:36 AM",
-      status: "read",
-    },
-  ];
+  };
 
   return (
     <div className="relative w-full md:w-[65vw] lg:w-[70vw] xl:w-[75vw] bg-[#0b0e11] border-l border-l-[#252632] h-screen flex flex-col">
@@ -108,16 +115,16 @@ const ChatContainer = () => {
             <BsArrowLeft size={20} />
           </button>
           <div className="relative mr-3">
-            <div className="w-10 h-10 rounded-full bg-[#3a3b4c] flex items-center justify-center text-white">
-            {selectedChatData.image ? (
-                        <img
-                          src={selectedChatData.image}
-                          alt={selectedChatData.fullName}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <span>{selectedChatData.fullName.charAt(0).toUpperCase()}</span>
-                      )}
+            <div className="w-10 h-10 rounded-full bg-[#3a3b4c] flex items-center justify-center text-white overflow-hidden">
+              {selectedChatData.image ? (
+                <img
+                  src={selectedChatData.image}
+                  alt={selectedChatData.fullName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span>{selectedChatData.fullName.charAt(0).toUpperCase()}</span>
+              )}
             </div>
             <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0b0e11]"></div>
           </div>
@@ -130,50 +137,17 @@ const ChatContainer = () => {
           <button className="hover:text-white transition-colors">
             <RiSearchLine size={20} />
           </button> 
-          <button className=" mr-2 text-gray-400 hover:text-white" onClick={closeChat}>
+          <button className="mr-2 text-gray-400 hover:text-white" onClick={closeChat}>
             <RiCloseFill size={20} />
-          </button>
-          <button className="hover:text-white transition-colors">
-            <FiMoreVertical size={20} />
           </button>
         </div>
       </div>
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-4 bg-[#111319] bg-opacity-90 bg-[url('https://web.whatsapp.com/img/bg-chat-tile-dark_a4be512e7195b6b733d9110b408f075d.png')]">
-        <div className="space-y-3">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${
-                message.sender === "me" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`max-w-xs md:max-w-md rounded-lg px-4 py-2 ${
-                  message.sender === "me"
-                    ? "bg-[#005c4b] text-white rounded-tr-none"
-                    : "bg-[#1e1f2a] text-white rounded-tl-none"
-                }`}
-              >
-                <p>{message.text}</p>
-                <div
-                  className={`flex items-center justify-end space-x-1 mt-1 text-xs ${
-                    message.sender === "me" ? "text-[#a3beb6]" : "text-gray-500"
-                  }`}
-                >
-                  <span>{message.time}</span>
-                  {message.sender === "me" && (
-                    <BsCheck2All
-                      className={
-                        message.status === "read" ? "text-blue-400" : ""
-                      }
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="space-y-1">
+          {renderMessages()}
+          <div ref={scrollRef} />
         </div>
       </div>
 
@@ -186,15 +160,15 @@ const ChatContainer = () => {
           >
             <FiSmile size={22} />
           </button>
-          <div className="absolute bottom-18 left-2" ref ={emojiRef}>
-            <EmojiPicker
-              theme="dark"
-              open={emojiPickerOpen}
-              onEmojiClick={handleAddEmoji}
-              onClose={() => setEmojiPickerOpen(false)}
-              autoFocusSearch={false}
-            />
-          </div>
+          {emojiPickerOpen && (
+            <div className="absolute bottom-16 left-2 z-10" ref={emojiRef}>
+              <EmojiPicker
+                theme="dark"
+                onEmojiClick={handleAddEmoji}
+                autoFocusSearch={false}
+              />
+            </div>
+          )}
           <button className="p-2 text-gray-400 hover:text-white">
             <FiPaperclip size={22} />
           </button>
@@ -203,13 +177,16 @@ const ChatContainer = () => {
             placeholder="Type a message"
             className="flex-1 bg-[#2a2b36] text-white rounded-lg px-4 py-2 mx-2 focus:outline-none focus:ring-1 focus:ring-[#3a3b4c]"
             onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyPress}
             value={message}
           />
           <button className="p-2 text-gray-400 hover:text-white">
             <FiMic size={22} />
           </button>
-          <button className="ml-2 p-2 bg-[#005c4b] text-white rounded-full hover:bg-[#008069]"
-            onClick={sendMessage} // Function to send the message
+          <button 
+            className="ml-2 p-2 bg-[#005c4b] text-white rounded-full hover:bg-[#008069] disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={sendMessage}
+            disabled={!message.trim()}
           >
             <IoMdSend size={20} />
           </button>

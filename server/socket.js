@@ -42,7 +42,7 @@ const setupSocket = (server) => {
       }
     });
   
-    socket.on("disconnect", () => {
+    io.on("disconnect", () => {
       disconnect(socket);
     });
   });

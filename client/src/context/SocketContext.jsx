@@ -50,7 +50,10 @@ export const SocketProvider = ({ children }) => {
     const handleReceiveMessage = (message) => {
       const {selectedChatData, selectedChatType, addMessage} = useAppStore.getState();
 
-      if(selectedChatType!== undefined && selectedChatData._id === message.sender.id || selectedChatData._id === message.recipient.id){
+      // Fix the comparison logic
+      if(selectedChatType !== undefined && 
+         (selectedChatData._id === message.sender._id || 
+          selectedChatData._id === message.recipient._id)){
         addMessage(message);
         console.log("Message received in active chat:", message);
       }
@@ -64,6 +67,7 @@ export const SocketProvider = ({ children }) => {
       socket.current.disconnect();
     };
   }, [userInfo]);
+  
   return (
     <socketContext.Provider value={socket}>{children}</socketContext.Provider>
   );
