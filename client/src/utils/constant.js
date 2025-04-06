@@ -10,3 +10,7 @@ export const UPDATE_PROFILE_ROUTE = `${AUTH_ROUTES}/update-profile`;
 
 export const CONTACT_ROUTES = "api/contacts";
 export const SEARCH_CONTACTS = `${CONTACT_ROUTES}/search`;
+
+
+export const MESSAGES_ROUTES = "api/messages";
+export const GET_ALL_MESSAGES_ROUTES = `${MESSAGES_ROUTES}/get-messages`;

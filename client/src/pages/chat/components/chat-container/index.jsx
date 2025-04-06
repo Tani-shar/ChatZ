@@ -7,13 +7,16 @@ import EmojiPicker from "emoji-picker-react";
 import { useAppStore } from "../../../../store";
 import { useSocket } from "../../../../context/SocketContext";
 import moment from "moment";
+import { getMessages } from "../../../../../../server/controller/MessageController";
+import apiClient from "../../../../lib/api-client";
+import {  GET_ALL_MESSAGES_ROUTES } from "../../../../utils/constant";
 
 const ChatContainer = () => {
   const socket = useSocket();
   const [message, setMessage] = useState("");
   const emojiRef = useRef(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const { closeChat, selectedChatData, selectedChatType, userInfo, selectedChatMessages } = useAppStore();
+  const { closeChat, selectedChatData, selectedChatType, userInfo, selectedChatMessages , setSelectedChatMessages} = useAppStore();
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -21,6 +24,37 @@ const ChatContainer = () => {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [selectedChatMessages]);
+
+  useEffect(() => {
+    const getAllMessages = async () => {
+      try {
+        console.log("Sending request with ID:", selectedChatData._id);
+
+        const response = await apiClient.post(GET_ALL_MESSAGES_ROUTES,
+          {
+            userId: userInfo.id,
+            id: selectedChatData._id,
+          },
+          {
+            withCredentials: true,
+          }
+        );
+        if (response.data.messages) {
+          setSelectedChatMessages(response.data.messages);
+        }
+      }
+      catch (error) {
+        console.error("Error fetching messages:", error);
+      }
+    }
+  
+    if (selectedChatData._id) {
+      if (selectedChatType === "contact") {
+        getAllMessages();
+      }
+    }
+  }, [selectedChatData, selectedChatType, setSelectedChatMessages]);
+  
   
   const renderMessages = () => {
     let lastDate = null;
